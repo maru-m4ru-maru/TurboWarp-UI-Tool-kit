@@ -33,7 +33,7 @@
     return e;
   };
 
-  // A,B,C / 改行くじ技r / JSON配列 のいずれも受け付けます。
+  // A,B,C / 改行 / JSON配列 のいずれも受け付けます。
   const parseList = (v) => {
     const s = str(v).trim();
     if (!s) return [];
@@ -883,6 +883,7 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
       this.gen++;
       if (this.activeClose) this.activeClose();
       this.removeAll();
+      this.stopBindingPoll();
       this.clearToasts();
       this.loading({ STATE: 'hide' });
       for (const x of this.waiters.splice(0)) x.done(true);
@@ -1234,7 +1235,7 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
 
     /* === イベント(正直、ハットブロックいらないと思う) === */
 
-    // hover/focus/blur は「最後に操作されたUI」や「いずれかのUI部品が操作されたとき」には影響させま千円
+    // hover/focus/blur は「最後に操作されたUI」や「いずれかのUI部品が操作されたとき」には影響させません
     fire(w, kind) {
       const quiet = kind === 'hover' || kind === 'focus' || kind === 'blur';
       const key = w.id + '|' + kind;
@@ -1296,7 +1297,7 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
         pulse: [{ transform: 'scale(1)' }, { transform: 'scale(1.12)', offset: 0.5 }, { transform: 'scale(1)' }]
       }[kind];
       if (!w || !F || !w.root.animate) return;
-      // OSの「視覚効果を減らす」設定を尊重する(全米が泣いた)
+      // OSの「視覚効果を減らす」設定を尊重する
       const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const ms = reduce ? 1 : clamp(num(args.SEC, 0.4), 0.05, 30) * 1000;
       for (const a of w.root.getAnimations()) a.cancel();
@@ -1332,12 +1333,21 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
       w.bind = '';
       const name = str(args.VAR).trim();
       const v = name ? this.findVar(name) : null;
-      if (!v) return;
+      if (!v) {
+        if (!this.bound.size) this.stopBindingPoll();
+        return;
+      }
       w.bind = name;
       w.boundLast = v.value;
       this.bound.add(w);
       this.applyVar(w, v.value);
-      if (!this.poll) this.poll = setInterval(() => this.pullBindings(), 100); // AFTER_EXECUTEの補助
+      if (!this.poll) this.poll = setInterval(() => this.pullBindings(), 100);
+    }
+
+    stopBindingPoll() {
+      if (!this.poll) return;
+      clearInterval(this.poll);
+      this.poll = 0;
     }
 
     applyVar(w, val) {
