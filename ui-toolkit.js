@@ -51,10 +51,10 @@
   // CSS内の url() を無効化
   const safeCss = (v) => str(v).replace(/url\s*\(/gi, 'blocked(');
 
-  const TEXTY = new Set(['input', 'textarea', 'number', 'color']); // 文字列を直接持つ入力部品ダヨ！
+  const TEXTY = new Set(['input', 'textarea', 'number', 'color']); // 文字列を直接持つ入力部品
   const OPTION_TYPES = new Set(['dropdown', 'list', 'radio', 'tabs']); // 選択肢を持つ部品
 
-  // ショートカットキー表記の正規化（Ctrl+S から ctrl+sみたいなネ。）
+  // ショートカットキー表記の正規化（Ctrl+S から ctrl+sみたいな）
   const KEY_ALIAS = {
     esc: 'escape', return: 'enter', spacebar: 'space', cmd: 'ctrl', command: 'ctrl', meta: 'ctrl',
     control: 'ctrl', del: 'delete', up: 'arrowup', down: 'arrowdown', left: 'arrowleft', right: 'arrowright'
@@ -421,7 +421,7 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
         if (!e.relatedTarget || !e.relatedTarget.closest || !e.relatedTarget.closest(SEL)) this.hoverUI = false;
       });
 
-      // ショートカットキー（入力欄やダイアログ内のキーは上のguardで止まるので反応しない...はず）
+      // ショートカットキー（入力欄やダイアログ内のキーは上のguardで止まるので反応しない作り）
       document.addEventListener('keydown', (e) => {
         if (!this.shortcuts.size || e.repeat || e.isComposing) return;
         const w = this.widgets.get(this.shortcuts.get(eventKey(e)));
@@ -445,7 +445,7 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
       }
     }
 
-    // addOverlayが無い環境へ向けた優しい配慮(全米が泣いた)
+    // addOverlayが無い環境へ向けた配慮
     mountFallback(root) {
       const canvas = Scratch.renderer && Scratch.renderer.canvas;
       document.body.appendChild(root);
@@ -523,7 +523,7 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
       this.autoClean = args.ONOFF !== 'off';
     }
 
-    /* === 通知(結構便利でしょう？) === */
+    /* === 通知 === */
 
     toast(args) {
       this.ensureRoot();
