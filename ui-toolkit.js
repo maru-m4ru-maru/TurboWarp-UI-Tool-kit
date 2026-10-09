@@ -51,20 +51,22 @@
   // CSS内の url() を無効化
   const safeCss = (v) => str(v).replace(/url\s*\(/gi, 'blocked(');
 
-  const TEXTY = new Set(['input', 'textarea', 'number', 'color']); // 文字列を直接持つ入力部品
-  const OPTION_TYPES = new Set(['dropdown', 'list', 'radio', 'tabs']); // 選択肢を持つ部品
+  const TEXTY = new Set(['input', 'textarea', 'number', 'color']);
+  const OPTION_TYPES = new Set(['dropdown', 'list', 'radio', 'tabs']);
 
-  // ショートカットキー表記の正規化（Ctrl+S から ctrl+sみたいな）
+  // ショートカットキー表記の正規化
   const KEY_ALIAS = {
     esc: 'escape', return: 'enter', spacebar: 'space', cmd: 'ctrl', command: 'ctrl', meta: 'ctrl',
     control: 'ctrl', del: 'delete', up: 'arrowup', down: 'arrowdown', left: 'arrowleft', right: 'arrowright'
   };
+
   const normKey = (v) => {
     const parts = str(v).toLowerCase().split('+').map((x) => x.trim()).filter(Boolean).map((x) => KEY_ALIAS[x] || x);
     const mods = ['ctrl', 'alt', 'shift'].filter((m) => parts.includes(m));
     const key = parts.find((p) => !['ctrl', 'alt', 'shift'].includes(p)) || '';
     return key ? [...mods, key].join('+') : '';
   };
+
   const eventKey = (e) => {
     const mods = [(e.ctrlKey || e.metaKey) && 'ctrl', e.altKey && 'alt', e.shiftKey && 'shift'].filter(Boolean);
     let k = String(e.key).toLowerCase();
@@ -90,6 +92,7 @@
     light: { bg: '#ffffff', text: '#1f2430', shadow: 'rgba(15,23,42,.20)' },
     dark: { bg: '#1e2230', text: '#eef0f6', shadow: 'rgba(0,0,0,.55)' }
   };
+
   const DEFAULTS = {
     accent: '#3b82f6',
     radius: 10,
@@ -293,6 +296,7 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
       this.zBot = 0;
 
       runtime.on('PROJECT_STOP_ALL', () => { if (this.autoClean) this.cleanup(); });
+
       // イベントは1フレームだけ有効（ハットブロックの暴発防止のため）
       runtime.on('AFTER_EXECUTE', () => {
         this.events.clear();
@@ -307,9 +311,12 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
       const m = (menu, d) => ({ type: AT.STRING, menu, defaultValue: d });
       const label = (text) => ({ blockType: BT.LABEL, text });
       const menus = {};
-      for (const k of Object.keys(MENUS)) menus[k] = { acceptReporters: true, items: MENUS[k] };
 
-      menus.variables = { acceptReporters: true, items: 'variableMenu' }; // 動的メニュー（変数一覧）
+      for (const k of Object.keys(MENUS)) {
+        menus[k] = { acceptReporters: true, items: MENUS[k] };
+      }
+
+      menus.variables = { acceptReporters: true, items: 'variableMenu' };
 
       return {
         id: EXT,
@@ -433,50 +440,56 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
       this.root = root;
       this.applyTheme();
 
-      const r = Scratch.renderer;
-      if (r && typeof r.addOverlay === 'function') {
-        // ステージの実サイズ(px)で配置され、全画面表示でも自動拡大されます
-        r.addOverlay(root, 'scale');
-      } else {
-        this.mountFallback(root);
-      }
+      // リストモニターなどのGUI要素より前面に出すため、
+      // ステージ専用オーバーレイではなく、ページ直下の固定レイヤーに配置します。
+      // mountFallback内でステージの位置・サイズに追従するため、既存の座標系は維持されます。
+      this.mountFallback(root);
+
       if (window.matchMedia) {
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => this.applyTheme());
       }
     }
 
-    // addOverlayが無い環境へ向けた配慮
+    // ステージ座標に追従するページ直下の前面レイヤー
     mountFallback(root) {
       const canvas = Scratch.renderer && Scratch.renderer.canvas;
       document.body.appendChild(root);
       root.style.position = 'fixed';
+      root.style.zIndex = '2147483647';
       root.style.transformOrigin = '0 0';
+
       const sync = () => {
         if (canvas) {
           const w = runtime.stageWidth || 480;
           const h = runtime.stageHeight || 360;
           const rect = canvas.getBoundingClientRect();
+
           root.style.left = rect.left + 'px';
           root.style.top = rect.top + 'px';
           root.style.width = w + 'px';
           root.style.height = h + 'px';
           root.style.transform = 'scale(' + rect.width / w + ')';
         }
+
         requestAnimationFrame(sync);
       };
+
       sync();
     }
 
     applyTheme() {
       if (!this.root) return;
       let mode = this.mode;
+
       if (mode === 'auto') {
         mode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       }
+
       const o = this.overrides;
       const p = PALETTE[mode];
       const accent = o.accent || DEFAULTS.accent;
       const set = (k, v) => this.root.style.setProperty(k, v);
+
       set('--ui-bg', o.bg || p.bg);
       set('--ui-text', o.text || p.text);
       set('--ui-shadow', p.shadow);
@@ -501,10 +514,12 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
       const prop = str(args.PROP);
       if (!['accent', 'bg', 'text', 'fontSize', 'radius', 'font'].includes(prop)) return;
       const v = str(args.VALUE).trim();
+
       if (v === '') delete this.overrides[prop];
       else if (prop === 'fontSize') this.overrides[prop] = clamp(num(v, 14), 6, 120);
       else if (prop === 'radius') this.overrides[prop] = clamp(num(v, 10), 0, 100);
       else this.overrides[prop] = v;
+
       this.applyTheme();
     }
 
@@ -532,6 +547,7 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
       const t = el('div', 'uitk-t t-' + type);
       t.setAttribute('role', type === 'error' ? 'alert' : 'status');
       t.append(el('i', '', icon), el('span', '', nl(args.TEXT)));
+
       let closed = false;
       const close = () => {
         if (closed) return;
@@ -539,9 +555,14 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
         t.classList.add('out');
         setTimeout(() => t.remove(), 220);
       };
+
       t.addEventListener('click', close);
       this.toasts.append(t);
-      while (this.toasts.children.length > 6) this.toasts.firstElementChild.remove();
+
+      while (this.toasts.children.length > 6) {
+        this.toasts.firstElementChild.remove();
+      }
+
       const ms = num(args.SEC) * 1000;
       if (ms > 0) setTimeout(close, ms);
     }
@@ -558,11 +579,12 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
 
     /* === ダイアログ === */
 
-    // ダイアログが複数ある場合は整列させる(1つずつ表示する)
+    // ダイアログが複数ある場合は整列させる（1つずつ表示する）
     dialog(cfg) {
       const gen = this.gen;
       const p = this.queue.then(() => this.runDialog(cfg, gen));
       this.queue = p;
+
       return p.then((res) => {
         this.lastDialog = { canceled: res.canceled, index: res.index };
         return res;
@@ -572,15 +594,20 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
     runDialog(cfg, gen) {
       return new Promise((resolve) => {
         if (gen !== this.gen) return resolve({ canceled: true, index: 0, value: '' });
+
         this.ensureRoot();
+
         const bd = el('div', 'uitk-bd');
         const dlg = el('div', 'uitk-dlg');
+
         dlg.setAttribute('role', 'dialog');
         dlg.setAttribute('aria-modal', 'true');
+
         if (cfg.title) dlg.append(el('h3', '', cfg.title));
         if (cfg.text) dlg.append(el('p', '', cfg.text));
 
         let finished = false;
+
         const finish = (res) => {
           if (finished) return;
           finished = true;
@@ -588,9 +615,11 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
           bd.remove();
           resolve(res);
         };
+
         const cancel = () => finish({ canceled: true, index: 0, value: '' });
         let input = null;
         const ok = () => finish({ canceled: false, index: 0, value: input ? input.value : '' });
+
         const btn = (text, cls, fn) => {
           const b = el('button', 'uitk-btn ' + cls, text);
           b.type = 'button';
@@ -600,6 +629,7 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
 
         let first = null;
         const acts = el('div', 'uitk-acts');
+
         if (cfg.kind === 'prompt') {
           input = el('input', 'uitk-in');
           input.type = 'text';
@@ -608,29 +638,37 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
           dlg.append(input);
           first = input;
         }
+
         if (cfg.kind === 'choice') {
           const list = el('div', 'uitk-list');
+
           cfg.options.forEach((o, i) => {
             const b = btn(o, 'ghost', () => finish({ canceled: false, index: i + 1, value: o }));
             list.append(b);
             if (!first) first = b;
           });
+
           dlg.append(list);
         }
+
         if (cfg.kind !== 'alert') acts.append(btn(this.labels.cancel, 'ghost', cancel));
+
         if (cfg.kind !== 'choice') {
           const b = btn(this.labels.ok, '', ok);
           acts.append(b);
           if (!first) first = b;
         }
+
         if (!first) first = acts.lastElementChild;
         dlg.append(acts);
 
         bd.addEventListener('keydown', (e) => {
           e.stopPropagation();
+
           if (e.key === 'Escape') {
             e.preventDefault();
-            if (cfg.kind === 'alert') ok(); else cancel();
+            if (cfg.kind === 'alert') ok();
+            else cancel();
           } else if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') {
             e.preventDefault();
             ok();
@@ -643,11 +681,13 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
             e.preventDefault();
           }
         });
+
         bd.addEventListener('keyup', (e) => e.stopPropagation());
 
         bd.append(dlg);
         this.modals.append(bd);
         this.activeClose = cancel;
+
         if (first) {
           first.focus();
           if (input) input.select();
@@ -681,7 +721,7 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
       this.labels = { ok: str(args.OK) || 'OK', cancel: str(args.CANCEL) || 'キャンセル' };
     }
 
-    /* === UI部品(作成) === */
+    /* === UI部品（作成） === */
 
     get(id) {
       return this.widgets.get(str(id).trim());
@@ -690,14 +730,18 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
     createWidget(args) {
       const id = str(args.ID).trim();
       const type = str(args.TYPE);
+
       if (!id || !MENUS.widgetType.some((i) => i.value === type)) return;
+
       this.ensureRoot();
+
       if (this.widgets.has(id)) this.removeWidget({ ID: id });
 
       const w = {
         id, type, x: Math.round(num(args.X)), y: Math.round(num(args.Y)),
         parent: '', text: '', anchor: 'center', margin: 0, bind: ''
       };
+
       this.build(w);
       w.root.classList.add('uitk-w', 'uitk-top');
       this.widgets.set(id, w);
@@ -708,6 +752,7 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
 
     build(w) {
       const t = w.type;
+
       switch (t) {
         case 'button':
           w.root = w.ctl = el('button', 'uitk-btn');
@@ -715,17 +760,21 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
           // マウス操作後はフォーカスを外し、ゲームのキー入力を妨げません。
           w.ctl.addEventListener('click', (e) => { if (e.detail > 0) w.ctl.blur(); });
           break;
+
         case 'label':
           w.root = el('div', 'uitk-label');
           break;
+
         case 'input':
           w.root = w.ctl = el('input', 'uitk-in');
           w.ctl.type = 'text';
           break;
+
         case 'textarea':
           w.root = w.ctl = el('textarea', 'uitk-in');
           w.ctl.rows = 3;
           break;
+
         case 'checkbox':
         case 'switch':
           w.root = el('label', t === 'switch' ? 'uitk-sw' : 'uitk-ck');
@@ -736,6 +785,7 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
           if (t === 'switch') w.root.append(el('span', 'trk'));
           w.root.append(w.lab);
           break;
+
         case 'slider': {
           w.root = el('div', 'uitk-sl');
           const head = el('div', 'hd');
@@ -752,22 +802,27 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
           w.root.append(head, w.ctl);
           break;
         }
+
         case 'dropdown':
           w.root = w.ctl = el('select', 'uitk-in');
           break;
+
         case 'list':
           w.root = w.ctl = el('select', 'uitk-in');
           w.ctl.size = 5;
           break;
+
         case 'number':
           w.root = w.ctl = el('input', 'uitk-in');
           w.ctl.type = 'number';
           break;
+
         case 'color':
           w.root = w.ctl = el('input', 'uitk-in uitk-color');
           w.ctl.type = 'color';
           w.ctl.value = '#3b82f6';
           break;
+
         case 'radio':
         case 'tabs':
           w.root = el('div', t === 'tabs' ? 'uitk-tabs' : 'uitk-grp');
@@ -776,6 +831,7 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
           w.sel = '';
           w.opts = [];
           break;
+
         case 'progress':
           w.root = el('div', 'uitk-pg');
           w.root.setAttribute('role', 'progressbar');
@@ -786,15 +842,18 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
           w.num = 0;
           w.root.append(w.bar, w.lab);
           break;
+
         case 'image':
           w.root = el('img', 'uitk-img');
           w.root.alt = '';
           w.root.draggable = false;
           break;
+
         case 'panel':
         case 'row':
           w.root = w.inner = el('div', 'uitk-panel' + (t === 'row' ? ' row' : ''));
           break;
+
         case 'window': {
           w.root = el('div', 'uitk-win');
           const head = el('div', 'uitk-win-h');
@@ -802,33 +861,41 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
           const x = el('button', 'uitk-x', '✕');
           x.type = 'button';
           x.setAttribute('aria-label', '閉じる');
+
           x.addEventListener('click', () => {
             this.applyState(w, 'hide');
             this.fire(w, 'close');
           });
+
           head.append(w.lab, x);
           w.inner = el('div', 'uitk-win-b');
           w.root.append(head, w.inner);
+
           w.root.addEventListener('pointerdown', () => {
             if (!w.parent && Number(w.root.style.zIndex || 0) !== this.zTop) this.reorder(w, true);
           });
+
           this.makeDraggable(w, head);
           break;
         }
       }
 
       // --- イベント ---
-      const own = (e) => e.target.closest('.uitk-w') === w.root; // 子部品のイベントは除外
+      const own = (e) => e.target.closest('.uitk-w') === w.root;
+
       w.root.addEventListener('dblclick', (e) => { if (own(e)) this.fire(w, 'dblclick'); });
       w.root.addEventListener('pointerenter', () => this.fire(w, 'hover'));
+
       if (['button', 'label', 'image', 'panel', 'row', 'progress'].includes(t)) {
         w.root.addEventListener('click', (e) => { if (own(e)) this.fire(w, 'click'); });
       }
+
       if (w.ctl) {
         w.ctl.addEventListener('input', () => this.fire(w, 'input'));
         w.ctl.addEventListener('change', () => this.fire(w, 'change'));
         w.ctl.addEventListener('focus', () => this.fire(w, 'focus'));
         w.ctl.addEventListener('blur', () => this.fire(w, 'blur'));
+
         if (t === 'input' || t === 'textarea' || t === 'number') {
           w.ctl.addEventListener('keydown', (e) => {
             if (e.key !== 'Enter' || e.isComposing) return;
@@ -842,34 +909,46 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
       handle.addEventListener('pointerdown', (e) => {
         if (w.parent || e.target.closest('button')) return;
         e.preventDefault();
+
         const rect = this.root.getBoundingClientRect();
-        const k = rect.width / this.root.offsetWidth || 1; // 画面上の拡大率
+        const k = rect.width / this.root.offsetWidth || 1;
         const sx = e.clientX, sy = e.clientY, ox = w.x, oy = w.y;
         handle.setPointerCapture(e.pointerId);
+
         const move = (ev) => {
           w.x = Math.round(ox + (ev.clientX - sx) / k);
           w.y = Math.round(oy - (ev.clientY - sy) / k);
           this.place(w);
         };
+
         const up = () => {
           handle.removeEventListener('pointermove', move);
           handle.removeEventListener('pointerup', up);
           handle.removeEventListener('pointercancel', up);
         };
+
         handle.addEventListener('pointermove', move);
         handle.addEventListener('pointerup', up);
         handle.addEventListener('pointercancel', up);
       });
     }
 
-    /* === UI部品(削除と配置と階層) === */
+    /* === UI部品（削除と配置と階層） === */
 
     removeWidget(args) {
       const id = str(args.ID).trim();
       const w = this.widgets.get(id);
+
       if (!w) return;
-      for (const c of [...this.widgets.values()]) if (c.parent === id) this.removeWidget({ ID: c.id });
-      for (const [k, v] of this.shortcuts) if (v === id) this.shortcuts.delete(k);
+
+      for (const c of [...this.widgets.values()]) {
+        if (c.parent === id) this.removeWidget({ ID: c.id });
+      }
+
+      for (const [k, v] of this.shortcuts) {
+        if (v === id) this.shortcuts.delete(k);
+      }
+
       this.bound.delete(w);
       w.root.remove();
       this.widgets.delete(id);
@@ -881,30 +960,45 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
 
     cleanup() {
       this.gen++;
+
       if (this.activeClose) this.activeClose();
+
       this.removeAll();
       this.stopBindingPoll();
       this.clearToasts();
       this.loading({ STATE: 'hide' });
+
       for (const x of this.waiters.splice(0)) x.done(true);
+
       this.events.clear();
     }
 
-    // 座標はScratch(TurboWarp)と同じ向き（右が+x・上が+y）。アンカーが「中央」ならステージ中央が原点
-    // それ以外は「固定位置 + 余白」からのずれ。部品の中心(または固定した辺)が基準になるのであります
+    // 座標はScratchと同じ向き（右が+x・上が+y）
     place(w) {
       if (w.parent) return;
+
       const A = w.anchor, m = w.margin, s = w.root.style;
       const H = /left/.test(A) ? 'l' : /right/.test(A) ? 'r' : 'c';
       const V = /top/.test(A) ? 't' : /bottom/.test(A) ? 'b' : 'c';
+
       s.left = s.right = s.top = s.bottom = '';
+
       let tx = '0px', ty = '0px';
+
       if (H === 'l') s.left = (m + w.x) + 'px';
       else if (H === 'r') s.right = (m - w.x) + 'px';
-      else { s.left = 'calc(50% + ' + w.x + 'px)'; tx = '-50%'; }
+      else {
+        s.left = 'calc(50% + ' + w.x + 'px)';
+        tx = '-50%';
+      }
+
       if (V === 't') s.top = (m - w.y) + 'px';
       else if (V === 'b') s.bottom = (m + w.y) + 'px';
-      else { s.top = 'calc(50% - ' + w.y + 'px)'; ty = '-50%'; }
+      else {
+        s.top = 'calc(50% - ' + w.y + 'px)';
+        ty = '-50%';
+      }
+
       s.translate = tx + ' ' + ty;
     }
 
@@ -917,7 +1011,9 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
     anchorTo(args) {
       const w = this.get(args.ID);
       const a = str(args.ANCHOR);
+
       if (!w || !MENUS.anchor.some((i) => i.value === a)) return;
+
       w.anchor = a;
       w.margin = Math.round(clamp(num(args.M), -9999, 9999));
       this.place(w);
@@ -926,6 +1022,7 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
     moveTo(args) {
       const w = this.get(args.ID);
       if (!w) return;
+
       w.x = Math.round(num(args.X));
       w.y = Math.round(num(args.Y));
       this.place(w);
@@ -934,6 +1031,7 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
     moveBy(args) {
       const w = this.get(args.ID);
       if (!w) return;
+
       w.x += Math.round(num(args.X));
       w.y += Math.round(num(args.Y));
       this.place(w);
@@ -942,6 +1040,7 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
     setSize(args) {
       const w = this.get(args.ID);
       if (!w) return;
+
       const W = num(args.W), H = num(args.H);
       w.root.style.width = W > 0 ? W + 'px' : '';
       w.root.style.height = H > 0 ? H + 'px' : '';
@@ -950,10 +1049,15 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
     setParent(args) {
       const w = this.get(args.ID);
       if (!w) return;
+
       const pid = str(args.PARENT).trim();
       const p = pid ? this.widgets.get(pid) : null;
+
       if (p && p.inner && p !== w) {
-        for (let q = p; q; q = this.widgets.get(q.parent)) if (q === w) return; // 循環の防止
+        for (let q = p; q; q = this.widgets.get(q.parent)) {
+          if (q === w) return;
+        }
+
         p.inner.append(w.root);
         w.parent = p.id;
         w.root.classList.remove('uitk-top');
@@ -971,11 +1075,14 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
         w.root.style.zIndex = front ? ++this.zTop : --this.zBot;
         return;
       }
+
       const box = this.widgets.get(w.parent).inner;
-      if (front) box.append(w.root); else box.prepend(w.root);
+
+      if (front) box.append(w.root);
+      else box.prepend(w.root);
     }
 
-    /* === UI部品(内容、状態) === */
+    /* === UI部品（内容・状態） === */
 
     setText(args) {
       const w = this.get(args.ID);
@@ -984,39 +1091,44 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
 
     setTextOf(w, t) {
       w.text = t;
+
       switch (w.type) {
         case 'button':
         case 'label':
           w.root.textContent = t;
           break;
+
         case 'input':
         case 'textarea':
         case 'number':
         case 'color':
           w.ctl.value = t;
           break;
+
         case 'checkbox':
         case 'switch':
         case 'slider':
         case 'window':
           w.lab.textContent = t;
           break;
+
         case 'progress':
           this.drawProgress(w);
           break;
+
         case 'dropdown':
         case 'list':
         case 'radio':
         case 'tabs':
-          this.setOptionsOf(w, parseList(t)); // 選択肢系の部品では「テキスト=選択肢の一覧
+          this.setOptionsOf(w, parseList(t));
           break;
       }
     }
 
     drawProgress(w) {
       const p = w.max > w.min ? clamp((w.num - w.min) / (w.max - w.min), 0, 1) : 0;
+
       w.bar.style.width = p * 100 + '%';
-      // テキスト中の{p}は進捗率(%)に置き換わる仕様です
       w.lab.textContent = w.text.replace(/\{p\}/g, Math.round(p * 100));
       w.root.setAttribute('aria-valuenow', Math.round(p * 100));
     }
@@ -1024,6 +1136,7 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
     setValue(args) {
       const w = this.get(args.ID);
       if (!w) return;
+
       const r = this.setValueOf(w, args.VALUE);
       this.syncBind(w);
       return r;
@@ -1037,18 +1150,22 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
         case 'color':
           w.ctl.value = str(v);
           break;
+
         case 'checkbox':
         case 'switch':
           w.ctl.checked = Cast.toBoolean(v);
           break;
+
         case 'slider':
           w.ctl.value = num(v);
           w.vEl.textContent = w.ctl.value;
           break;
+
         case 'dropdown':
         case 'list':
           if ([...w.ctl.options].some((o) => o.value === str(v))) w.ctl.value = str(v);
           break;
+
         case 'radio':
         case 'tabs':
           if (w.opts.includes(str(v))) {
@@ -1056,19 +1173,23 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
             this.markGroup(w);
           }
           break;
+
         case 'progress':
           w.num = num(v);
           this.drawProgress(w);
           break;
+
         case 'image':
           return this.setImage(w, str(v));
+
         default:
           this.setTextOf(w, str(v));
       }
     }
 
     async setImage(w, url) {
-      if (url && !(await Scratch.canFetch(url))) return; // 許可されたURL（data: など）のみ
+      if (url && !(await Scratch.canFetch(url))) return;
+
       if (this.widgets.get(w.id) === w) w.root.src = url;
     }
 
@@ -1079,30 +1200,38 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
 
     setOptionsOf(w, opts) {
       w.text = JSON.stringify(opts);
+
       if (w.type === 'dropdown' || w.type === 'list') {
         const cur = w.ctl.value;
         w.ctl.textContent = '';
+
         for (const o of opts) w.ctl.append(new Option(o, o));
+
         if (opts.includes(cur)) w.ctl.value = cur;
       } else if (w.type === 'radio' || w.type === 'tabs') {
         this.buildGroup(w, opts);
       }
     }
 
-    // ラジオボタン/タブの選択肢を作り直す
+    // ラジオボタン・タブの選択肢を作り直す
     buildGroup(w, opts) {
       w.opts = opts;
+
       if (!opts.includes(w.sel)) w.sel = w.type === 'tabs' ? (opts[0] || '') : '';
+
       w.root.textContent = '';
+
       for (const o of opts) {
         if (w.type === 'tabs') {
           const b = el('button', '', o);
           b.type = 'button';
           b.setAttribute('role', 'tab');
+
           b.addEventListener('click', (e) => {
             if (e.detail > 0) b.blur();
             this.pick(w, o);
           });
+
           w.root.append(b);
         } else {
           const lab = el('label');
@@ -1115,11 +1244,13 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
           w.root.append(lab);
         }
       }
+
       this.markGroup(w);
     }
 
     pick(w, o) {
       if (w.sel === o) return;
+
       w.sel = o;
       this.markGroup(w);
       this.fire(w, 'input');
@@ -1136,9 +1267,11 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
     setRange(args) {
       const w = this.get(args.ID);
       if (!w) return;
+
       const min = num(args.MIN);
       const max = Math.max(min, num(args.MAX, 100));
       const step = Math.max(num(args.STEP, 1), 0.000001);
+
       if (w.type === 'slider' || w.type === 'number') {
         w.ctl.min = min;
         w.ctl.max = max;
@@ -1154,13 +1287,16 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
     setStyle(args) {
       const w = this.get(args.ID);
       if (!w) return;
+
       const prop = str(args.PROP);
       const v = str(args.VALUE).trim();
       const s = w.root.style;
       const empty = v === '';
+
       switch (prop) {
         case 'color': s.color = safeCss(v); break;
         case 'background': s.background = safeCss(v); break;
+
         case 'accent':
           if (empty) {
             s.removeProperty('--ui-accent');
@@ -1170,32 +1306,42 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
             s.setProperty('--ui-on-accent', onColor(v));
           }
           break;
+
         case 'borderColor':
           s.borderColor = safeCss(v);
+
           if (!empty) {
             s.borderStyle = 'solid';
             if (!s.borderWidth) s.borderWidth = '1px';
           }
           break;
+
         case 'fontSize': s.fontSize = empty ? '' : clamp(num(v, 14), 4, 400) + 'px'; break;
         case 'radius': s.borderRadius = empty ? '' : Math.max(0, num(v)) + 'px'; break;
         case 'opacity': s.opacity = empty ? '' : clamp(num(v, 100), 0, 100) / 100; break;
         case 'padding': s.padding = empty ? '' : Math.max(0, num(v)) + 'px'; break;
         case 'gap': s.gap = empty ? '' : Math.max(0, num(v)) + 'px'; break;
+
         case 'justify':
           s.justifyContent = { start: 'flex-start', center: 'center', end: 'flex-end', between: 'space-between' }[v] || '';
           break;
+
         case 'align': s.textAlign = v; break;
+
         case 'tooltip':
           w.root.title = v;
-          if (empty) w.root.removeAttribute('aria-label'); else w.root.setAttribute('aria-label', v);
+          if (empty) w.root.removeAttribute('aria-label');
+          else w.root.setAttribute('aria-label', v);
           break;
+
         case 'placeholder':
           if (w.ctl && 'placeholder' in w.ctl) w.ctl.placeholder = v;
           break;
+
         case 'inputType':
           if (w.type === 'input' && ['text', 'password', 'email', 'tel', 'url', 'search'].includes(v)) w.ctl.type = v;
           break;
+
         case 'maxlength':
           if (w.type === 'input' || w.type === 'textarea') {
             if (empty) w.ctl.removeAttribute('maxlength');
@@ -1220,6 +1366,7 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
         case 'show': w.root.hidden = false; break;
         case 'hide': w.root.hidden = true; break;
         case 'toggle': w.root.hidden = !w.root.hidden; break;
+
         case 'enable':
         case 'disable': {
           const on = state === 'enable';
@@ -1227,27 +1374,33 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
           w.root.classList.toggle('uitk-disabled', !on);
           break;
         }
+
         case 'front': this.reorder(w, true); break;
         case 'back': this.reorder(w, false); break;
         case 'focus': (w.ctl || w.root).focus(); break;
       }
     }
 
-    /* === イベント(正直、ハットブロックいらないと思う) === */
+    /* === イベント === */
 
     // hover/focus/blur は「最後に操作されたUI」や「いずれかのUI部品が操作されたとき」には影響させません
     fire(w, kind) {
       const quiet = kind === 'hover' || kind === 'focus' || kind === 'blur';
       const key = w.id + '|' + kind;
+
       if (!quiet) this.last = { id: w.id, kind, value: this.readValue(w) };
       if (w.bind && (kind === 'input' || kind === 'change')) this.syncBind(w);
+
       this.mark(key);
       if (!quiet) this.mark('*');
+
       const hit = this.waiters.filter((x) => x.key === key);
+
       if (hit.length) {
         this.waiters = this.waiters.filter((x) => x.key !== key);
         for (const x of hit) x.done(false);
       }
+
       runtime.startHats(HAT_EVENT);
       if (!quiet) runtime.startHats(HAT_ANY);
     }
@@ -1256,7 +1409,9 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
     mark(k) {
       const t = ++this.tok;
       this.events.set(k, t);
-      setTimeout(() => { if (this.events.get(k) === t) this.events.delete(k); }, 500);
+      setTimeout(() => {
+        if (this.events.get(k) === t) this.events.delete(k);
+      }, 500);
     }
 
     whenEvent(args) {
@@ -1284,6 +1439,7 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
     runAnim(args) {
       const w = this.get(args.ID);
       const kind = str(args.ANIM);
+
       const F = {
         fadeIn: [{ opacity: 0 }, { opacity: 1 }],
         fadeOut: [{ opacity: 1 }, { opacity: 0 }],
@@ -1296,14 +1452,20 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
           { transform: 'translateX(-6px)', offset: 0.55 }, { transform: 'translateX(6px)', offset: 0.75 }, { transform: 'translateX(0)' }],
         pulse: [{ transform: 'scale(1)' }, { transform: 'scale(1.12)', offset: 0.5 }, { transform: 'scale(1)' }]
       }[kind];
+
       if (!w || !F || !w.root.animate) return;
+
       // OSの「視覚効果を減らす」設定を尊重する
       const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const ms = reduce ? 1 : clamp(num(args.SEC, 0.4), 0.05, 30) * 1000;
+
       for (const a of w.root.getAnimations()) a.cancel();
+
       if (['fadeIn', 'pop', 'slideUp', 'slideDown'].includes(kind)) w.root.hidden = false;
+
       const fadeOut = kind === 'fadeOut';
       const anim = w.root.animate(F, { duration: ms, easing: 'ease-out', fill: fadeOut ? 'forwards' : 'none' });
+
       return anim.finished.then(() => {
         if (fadeOut) {
           w.root.hidden = true;
@@ -1325,22 +1487,27 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
       return stage ? stage.lookupVariableByNameAndType(name, '') : null;
     }
 
-    // 変数が主(連動開始時は変数の値をUIに反映します。以後はUI操作→変数、変数の変更→UIの両方向)
+    // 変数が主（連動開始時は変数の値をUIに反映し、以後は双方向に同期）
     bindVariable(args) {
       const w = this.get(args.ID);
       if (!w) return;
+
       this.bound.delete(w);
       w.bind = '';
+
       const name = str(args.VAR).trim();
       const v = name ? this.findVar(name) : null;
+
       if (!v) {
         if (!this.bound.size) this.stopBindingPoll();
         return;
       }
+
       w.bind = name;
       w.boundLast = v.value;
       this.bound.add(w);
       this.applyVar(w, v.value);
+
       if (!this.poll) this.poll = setInterval(() => this.pullBindings(), 100);
     }
 
@@ -1357,8 +1524,10 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
 
     syncBind(w) {
       if (!w.bind) return;
+
       const v = this.findVar(w.bind);
       if (!v) return;
+
       const cur = this.readValue(w);
       v.value = cur;
       w.boundLast = cur;
@@ -1366,9 +1535,11 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
 
     pullBindings() {
       if (!this.bound.size) return;
+
       for (const w of this.bound) {
         const v = this.findVar(w.bind);
         if (!v || v.value === w.boundLast) continue;
+
         w.boundLast = v.value;
         this.applyVar(w, v.value);
       }
@@ -1379,7 +1550,11 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
     setShortcut(args) {
       const w = this.get(args.ID);
       if (!w) return;
-      for (const [k, id] of this.shortcuts) if (id === w.id) this.shortcuts.delete(k);
+
+      for (const [k, id] of this.shortcuts) {
+        if (id === w.id) this.shortcuts.delete(k);
+      }
+
       const key = normKey(args.KEY);
       if (key) this.shortcuts.set(key, w.id);
     }
@@ -1394,7 +1569,9 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
         }
         return;
       }
+
       this.ensureRoot();
+
       if (!this.loadEl) {
         const bd = el('div', 'uitk-bd');
         const box = el('div', 'uitk-load');
@@ -1404,6 +1581,7 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
         this.modals.append(bd);
         this.loadEl = bd;
       }
+
       this.loadEl.querySelector('.uitk-load').lastChild.textContent = nl(args.TEXT);
     }
 
@@ -1412,8 +1590,10 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
     waitEvent(args) {
       const key = str(args.ID).trim() + '|' + str(args.EVT);
       const sec = num(args.SEC);
+
       return new Promise((resolve) => {
         let timer = 0;
+
         const entry = {
           key,
           done: (timedOut) => {
@@ -1422,7 +1602,9 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
             resolve();
           }
         };
+
         this.waiters.push(entry);
+
         if (sec > 0) {
           timer = setTimeout(() => {
             this.waiters = this.waiters.filter((x) => x !== entry);
@@ -1435,61 +1617,95 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
     lastWaitTimedOut() { return this.lastWaitTimedOut_; }
     overUI() { return this.hoverUI; }
 
-    /* === レイアウトの保存とか === */
+    /* === レイアウトの保存と復元 === */
 
     exportUI() {
       const list = [...this.widgets.values()].map((w) => {
         const o = { id: w.id, type: w.type, text: w.text, x: w.x, y: w.y, anchor: w.anchor, margin: w.margin };
+
         if (w.parent) o.parent = w.parent;
         if (w.root.hidden) o.hidden = true;
         if (w.root.inert) o.disabled = true;
         if (w.bind) o.bind = w.bind;
+
         const css = w.root.style.cssText;
         if (css) o.css = css;
+
         const props = {};
+
         if (w.root.title) props.tooltip = w.root.title;
         if (w.ctl && w.ctl.placeholder) props.placeholder = w.ctl.placeholder;
         if (w.type === 'input' && w.ctl.type !== 'text') props.inputType = w.ctl.type;
-        if ((w.type === 'input' || w.type === 'textarea') && w.ctl.maxLength > 0) props.maxlength = w.ctl.maxLength;
+
+        if ((w.type === 'input' || w.type === 'textarea') && w.ctl.maxLength > 0) {
+          props.maxlength = w.ctl.maxLength;
+        }
+
         if (Object.keys(props).length) o.props = props;
+
         if (w.type === 'slider') o.range = [Number(w.ctl.min), Number(w.ctl.max), Number(w.ctl.step)];
         else if (w.type === 'number' && (w.ctl.min || w.ctl.max)) o.range = [Number(w.ctl.min || 0), Number(w.ctl.max || 100), Number(w.ctl.step || 1)];
         else if (w.type === 'progress') o.range = [w.min, w.max];
+
         if (TEXTY.has(w.type) || OPTION_TYPES.has(w.type) || ['checkbox', 'switch', 'slider', 'progress', 'image'].includes(w.type)) {
           o.value = this.readValue(w);
         }
+
         const sc = [...this.shortcuts].find(([, id]) => id === w.id);
         if (sc) o.shortcut = sc[0];
+
         return o;
       });
+
       return JSON.stringify({ v: 1, widgets: list });
     }
 
     importUI(args) {
       let data;
-      try { data = JSON.parse(str(args.JSON)); } catch (e) { return; }
+
+      try {
+        data = JSON.parse(str(args.JSON));
+      } catch (e) {
+        return;
+      }
+
       const list = Array.isArray(data) ? data : data && data.widgets;
       if (!Array.isArray(list)) return;
+
       this.removeAll();
+
       const ok = list.filter((o) => o && typeof o.id === 'string' && typeof o.type === 'string');
+
       for (const o of ok) {
         this.createWidget({ TYPE: o.type, ID: o.id, TEXT: o.text === undefined ? '' : o.text, X: o.x, Y: o.y });
+
         const w = this.widgets.get(o.id);
         if (!w) continue;
-        if (Array.isArray(o.range)) this.setRange({ ID: o.id, MIN: o.range[0], MAX: o.range[1], STEP: o.range[2] === undefined ? 1 : o.range[2] });
+
+        if (Array.isArray(o.range)) {
+          this.setRange({ ID: o.id, MIN: o.range[0], MAX: o.range[1], STEP: o.range[2] === undefined ? 1 : o.range[2] });
+        }
+
         if (o.css) w.root.style.cssText = safeCss(o.css);
+
         if (o.props && typeof o.props === 'object') {
           for (const p of ['tooltip', 'placeholder', 'inputType', 'maxlength']) {
             if (o.props[p] !== undefined) this.setStyle({ ID: o.id, PROP: p, VALUE: o.props[p] });
           }
         }
+
         w.anchor = MENUS.anchor.some((i) => i.value === o.anchor) ? o.anchor : 'center';
         w.margin = num(o.margin);
         this.place(w);
+
         if (o.value !== undefined) this.setValueOf(w, o.value);
         if (o.shortcut) this.setShortcut({ ID: o.id, KEY: o.shortcut });
       }
-      for (const o of ok) if (o.parent) this.setParent({ ID: o.id, PARENT: o.parent });
+
+      for (const o of ok) {
+        if (o.parent) this.setParent({ ID: o.id, PARENT: o.parent });
+      }
+
       for (const o of ok) {
         if (o.bind) this.bindVariable({ ID: o.id, VAR: o.bind });
         if (o.hidden) this.setState({ ID: o.id, STATE: 'hide' });
@@ -1505,16 +1721,31 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
         case 'textarea':
         case 'dropdown':
         case 'list':
-        case 'color': return w.ctl.value;
-        case 'number': return w.ctl.value === '' ? '' : Number(w.ctl.value);
+        case 'color':
+          return w.ctl.value;
+
+        case 'number':
+          return w.ctl.value === '' ? '' : Number(w.ctl.value);
+
         case 'checkbox':
-        case 'switch': return w.ctl.checked;
-        case 'slider': return Number(w.ctl.value);
+        case 'switch':
+          return w.ctl.checked;
+
+        case 'slider':
+          return Number(w.ctl.value);
+
         case 'radio':
-        case 'tabs': return w.sel;
-        case 'progress': return w.num;
-        case 'image': return w.root.getAttribute('src') || '';
-        default: return w.text;
+        case 'tabs':
+          return w.sel;
+
+        case 'progress':
+          return w.num;
+
+        case 'image':
+          return w.root.getAttribute('src') || '';
+
+        default:
+          return w.text;
       }
     }
 
@@ -1526,16 +1757,20 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
     getAttr(args) {
       const w = this.get(args.ID);
       if (!w) return '';
+
       switch (str(args.ATTR)) {
         case 'text': return TEXTY.has(w.type) || OPTION_TYPES.has(w.type) ? this.readValue(w) : w.text;
+
         case 'index':
           if (w.type === 'dropdown' || w.type === 'list') return w.ctl.selectedIndex + 1;
           if (w.type === 'radio' || w.type === 'tabs') return w.opts.indexOf(w.sel) + 1;
           return 0;
+
         case 'count':
           if (w.type === 'dropdown' || w.type === 'list') return w.ctl.options.length;
           if (w.type === 'radio' || w.type === 'tabs') return w.opts.length;
           return 0;
+
         case 'x': return w.x;
         case 'y': return w.y;
         case 'width': return w.root.offsetWidth;
@@ -1546,7 +1781,9 @@ border-top-color:var(--ui-accent);animation:uitk-rot .8s linear infinite}
         case 'type': return w.type;
         case 'parent': return w.parent;
         case 'anchor': return w.anchor;
-        default: return '';
+
+        default:
+          return '';
       }
     }
 
